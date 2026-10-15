@@ -33,7 +33,16 @@ jobs:
           fi
 
       - name: Build
-        run: gradle :app:assembleDebug --no-daemon
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon 2>&1 | tee build.log
+
+      # 실패하면 컴파일 에러를 주석(annotation)으로 남겨서 로그를 안 열어도 보이게 해요.
+      - name: Report errors
+        if: failure()
+        run: |
+          msg=$(grep -E "^e: |error:|What went wrong" -A2 build.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+          echo "::error title=Build failed::$msg"
 
       - uses: actions/upload-artifact@v4
         with:
