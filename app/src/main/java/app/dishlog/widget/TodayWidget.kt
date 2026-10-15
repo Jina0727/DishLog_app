@@ -39,6 +39,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import app.dishlog.DishlogApp
 import app.dishlog.R
+import app.dishlog.data.decodeUpright
 import app.dishlog.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -148,11 +149,7 @@ class TodayWidget : GlanceAppWidget() {
 
 /** 사진 파일을 가운데 기준 정사각형 썸네일로. */
 private fun thumbnail(path: String): Bitmap? = runCatching {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(path, bounds)
-    var sample = 1
-    while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= THUMB_PX) sample *= 2
-    val src = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+    val src = decodeUpright(path, THUMB_PX) ?: return null
     val side = minOf(src.width, src.height)
     val square = Bitmap.createBitmap(src, (src.width - side) / 2, (src.height - side) / 2, side, side)
     Bitmap.createScaledBitmap(square, THUMB_PX, THUMB_PX, true)

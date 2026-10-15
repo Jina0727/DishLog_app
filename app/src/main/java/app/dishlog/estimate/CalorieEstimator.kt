@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import app.dishlog.data.FoodItem
+import app.dishlog.data.decodeUpright
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -103,11 +104,8 @@ class ClaudeCalorieEstimator(
 
     /** 긴 변을 2000px 로 맞춰 보내요. 포장지·영양성분표 글씨도 읽힐 만큼. */
     private fun encodeScaled(file: File): String {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE) sample *= 2
-        val decoded = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+        // 회전 정보(EXIF)를 반영해 바로 선 사진으로 보내요.
+        val decoded = decodeUpright(file.absolutePath, MAX_SIDE / 2)
             ?: throw IOException("사진을 열 수 없어요: ${file.name}")
         val longSide = maxOf(decoded.width, decoded.height)
         val bmp = if (longSide <= MAX_SIDE) decoded else {
