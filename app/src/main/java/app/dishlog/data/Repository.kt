@@ -76,7 +76,8 @@ class MealRepository(
     /** 기록이 추가·수정·삭제될 때마다 신호가 와요. 위젯 갱신에 써요. */
     val mealsChanged: Flow<Int> = db.meals().observeCount()
 
-    data class DaySummary(val count: Int, val kcal: Int, val pending: Boolean)
+    /** photos: 오늘 기록마다 첫 사진 경로 (시간순) */
+    data class DaySummary(val count: Int, val kcal: Int, val pending: Boolean, val photos: List<String>)
 
     suspend fun todaySummary(): DaySummary {
         val list = db.meals().dayOnce(java.time.LocalDate.now().toEpochDay())
@@ -84,6 +85,7 @@ class MealRepository(
             count = list.size,
             kcal = list.mapNotNull { it.totalKcal() }.sum(),
             pending = list.any { it.estimateState == EstimateState.PENDING },
+            photos = list.mapNotNull { it.photos.firstOrNull() },
         )
     }
 
