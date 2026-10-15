@@ -22,7 +22,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.dishlog.DishlogApp
 import app.dishlog.ui.camera.CameraCapture
-import app.dishlog.ui.screens.DayScreen
 import app.dishlog.ui.screens.EntryScreen
 import app.dishlog.ui.screens.SettingsScreen
 import app.dishlog.ui.screens.TodayScreen
@@ -49,7 +48,6 @@ class MainActivity : ComponentActivity() {
                             composable("today") {
                                 TodayScreen(
                                     repo = repo,
-                                    onOpenDay = { nav.navigate("day/$it") },
                                     onOpenEntry = { nav.navigate("entry/$it") },
                                     onCapture = { nav.navigate("capture") },
                                     onSettings = { nav.navigate("settings") },
@@ -57,16 +55,6 @@ class MainActivity : ComponentActivity() {
                             }
                             composable("settings") {
                                 Box(Modifier.statusBarsPadding()) { SettingsScreen(repo, onBack = { nav.popBackStack() }) }
-                            }
-                            composable("day/{day}", listOf(navArgument("day") { type = NavType.LongType })) {
-                                Box(Modifier.statusBarsPadding()) {
-                                    DayScreen(
-                                        repo = repo,
-                                        epochDay = it.arguments!!.getLong("day"),
-                                        onBack = { nav.popBackStack() },
-                                        onOpenEntry = { id -> nav.navigate("entry/$id") },
-                                    )
-                                }
                             }
                             composable("entry/{id}", listOf(navArgument("id") { type = NavType.LongType })) {
                                 EntryScreen(repo, it.arguments!!.getLong("id"), onBack = { nav.popBackStack() })
