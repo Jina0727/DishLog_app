@@ -29,10 +29,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,7 +102,6 @@ fun TodayScreen(
     val selected = dateOf(pager.currentPage)
 
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var photoMode by rememberSaveable { mutableStateOf(false) }
     var monthKey by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
     val month = YearMonth.parse(monthKey)
     LaunchedEffect(selected) { monthKey = YearMonth.from(selected).toString() }
@@ -171,12 +168,6 @@ fun TodayScreen(
                         }
                     }
                 }
-                IconButton(onClick = { photoMode = !photoMode }) {
-                    Icon(
-                        if (photoMode) Icons.Outlined.ViewAgenda else Icons.Outlined.GridView,
-                        contentDescription = if (photoMode) "카드로 보기" else "사진만 모아보기",
-                    )
-                }
                 IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "설정") }
             }
 
@@ -222,7 +213,7 @@ fun TodayScreen(
                     .graphicsLayer { translationY = shown },
                 key = { it },
             ) { page ->
-                DayPage(repo, dateOf(page), today, photoMode, onOpenEntry)
+                DayPage(repo, dateOf(page), today, onOpenEntry)
             }
         }
 
@@ -240,7 +231,7 @@ fun TodayScreen(
 
 /** 하루치 페이지: 요약 + 카드 목록(또는 사진 모아보기). */
 @Composable
-private fun DayPage(repo: MealRepository, date: LocalDate, today: LocalDate, photoMode: Boolean, onOpenEntry: (Long) -> Unit) {
+private fun DayPage(repo: MealRepository, date: LocalDate, today: LocalDate, onOpenEntry: (Long) -> Unit) {
     val entries by remember(date) { repo.day(date.toEpochDay()) }.collectAsStateWithLifecycle(emptyList())
     val total = entries.mapNotNull { it.totalKcal() }.sum()
     val padding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 120.dp)
@@ -272,31 +263,7 @@ private fun DayPage(repo: MealRepository, date: LocalDate, today: LocalDate, pho
         )
     }
 
-    if (photoMode) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            contentPadding = padding,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            item(span = { GridItemSpan(2) }) { summary() }
-            if (entries.isEmpty()) item(span = { GridItemSpan(2) }) { empty() }
-            items(entries.size, key = { entries[it].id }) { i ->
-                val e = entries[i]
-                Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(14.dp)).clickable { onOpenEntry(e.id) }) {
-                    Photo(e.photos.firstOrNull(), Modifier.fillMaxSize(), "${tagOf(e)} ${e.takenAt.hhmm()} 사진")
-                    Text(
-                        "${tagOf(e)} ${e.takenAt.hhmm()}",
-                        color = Color.White, fontSize = 12.sp,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)
-                            .clip(RoundedCornerShape(10.dp)).background(C.Ink.copy(alpha = 0.7f))
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
-            }
-        }
-    } else {
+    run {
         LazyColumn(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(10.dp),
