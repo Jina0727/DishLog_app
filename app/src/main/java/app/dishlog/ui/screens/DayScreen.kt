@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dishlog.data.MealRepository
 import app.dishlog.data.totalKcal
-import app.dishlog.ui.EntryCard
 import app.dishlog.ui.Photo
 import app.dishlog.ui.grouped
 import app.dishlog.ui.hhmm
@@ -120,7 +119,7 @@ fun DayScreen(repo: MealRepository, epochDay: Long, onBack: () -> Unit, onOpenEn
                 contentPadding = PaddingValues(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(entries, key = { it.id }) { e -> EntryCard(e) { onOpenEntry(e.id) } }
+                items(entries, key = { it.id }) { e -> ActionableEntryCard(repo, e) { onOpenEntry(e.id) } }
             }
         }
     }

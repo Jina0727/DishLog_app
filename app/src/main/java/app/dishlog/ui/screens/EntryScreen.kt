@@ -233,7 +233,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
 /** 수정 시트: 태그 · 시간 · 먹은 양 · 포만도 · 메모. 저장을 눌러야 반영돼요. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
+internal fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val slots = LocalSlots.current

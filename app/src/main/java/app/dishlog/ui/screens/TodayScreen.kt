@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dishlog.data.MealRepository
 import app.dishlog.data.totalKcal
-import app.dishlog.ui.EntryCard
 import app.dishlog.ui.grouped
 import app.dishlog.ui.koreanLong
 import app.dishlog.ui.theme.C
@@ -201,7 +200,7 @@ fun TodayScreen(
                     )
                 }
             }
-            items(entries, key = { it.id }) { e -> EntryCard(e) { onOpenEntry(e.id) } }
+            items(entries, key = { it.id }) { e -> ActionableEntryCard(repo, e) { onOpenEntry(e.id) } }
         }
 
         ExtendedFloatingActionButton(
