@@ -15,14 +15,11 @@ class DishlogApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        val estimator = BuildConfig.ANTHROPIC_API_KEY
-            .takeIf { it.isNotBlank() }
-            ?.let { ClaudeCalorieEstimator(it, BuildConfig.ANTHROPIC_MODEL) }
         repo = MealRepository(
             context = this,
             db = AppDatabase.build(this),
             prefs = Prefs(this),
-            estimator = estimator,
+            makeEstimator = { key -> ClaudeCalorieEstimator(key, ClaudeCalorieEstimator.MODEL) },
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
         )
     }

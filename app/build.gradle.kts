@@ -1,18 +1,8 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
-}
-
-// 칼로리 추정용 API 키는 local.properties 에 넣어요 (깃에 올라가지 않는 파일).
-//   anthropic.apiKey=sk-ant-...
-//   anthropic.model=claude-sonnet-5-5   (선택)
-val localProps = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -25,9 +15,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-
-        buildConfigField("String", "ANTHROPIC_API_KEY", "\"${localProps.getProperty("anthropic.apiKey", "")}\"")
-        buildConfigField("String", "ANTHROPIC_MODEL", "\"${localProps.getProperty("anthropic.model", "claude-sonnet-5-5")}\"")
     }
 
     // 빌드마다 서명이 바뀌면 폰에서 업데이트 설치가 막혀요. 고정된 개인용 디버그 키를 써요.

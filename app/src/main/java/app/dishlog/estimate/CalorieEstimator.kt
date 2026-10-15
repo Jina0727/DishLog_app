@@ -23,8 +23,7 @@ interface CalorieEstimator {
  * 비전 LLM(Claude)으로 사진 속 음식을 인식하고 양을 가늠해 칼로리를 추정해요.
  * 여러 장을 한 번에 보내서 겹쳐 찍힌 음식은 한 번만 세게 해요.
  *
- * 주의: API 키가 APK 안에 들어가므로 개인용으로만 쓰세요.
- * 스토어에 낼 때는 서버를 하나 두고 그쪽에서 호출하게 바꿔야 해요.
+ * API 키는 앱 설정에서 입력받아 폰 안에만 저장해요 (APK·저장소엔 들어가지 않아요).
  */
 class ClaudeCalorieEstimator(
     private val apiKey: String,
@@ -107,8 +106,23 @@ class ClaudeCalorieEstimator(
         return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     }
 
-    private companion object {
-        const val PROMPT = """
+    companion object {
+        const val MODEL = "claude-sonnet-5-5"
+
+        /** 키가 유효한지 가볍게 확인해요 (모델 목록 조회, 사용량이 들지 않아요). */
+        suspend fun verify(apiKey: String): Boolean = withContext(Dispatchers.IO) {
+            runCatching {
+                val conn = (URL("https://api.anthropic.com/v1/models?limit=1").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10_000
+                    readTimeout = 15_000
+                    setRequestProperty("x-api-key", apiKey.trim())
+                    setRequestProperty("anthropic-version", "2023-06-01")
+                }
+                try { conn.responseCode in 200..299 } finally { conn.disconnect() }
+            }.getOrDefault(false)
+        }
+
+        private const val PROMPT = """
 이 사진들은 한 끼 식사를 찍은 것이에요. 그릇이 여러 개이거나 여러 장에 나눠 찍혔을 수 있어요.
 같은 음식이 여러 장에 보이면 한 번만 세세요.
 보이는 음식마다 한국어 이름과, 사진에 보이는 양 기준 추정 칼로리(kcal, 정수)를 구하세요.

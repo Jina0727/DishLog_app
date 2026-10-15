@@ -2,6 +2,7 @@ package app.dishlog.ui.camera
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Rational
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -9,6 +10,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
@@ -17,6 +20,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -134,11 +138,11 @@ fun CameraCapture(
             Spacer(Modifier.width(48.dp))
         }
 
+        // 미리보기와 저장되는 사진 모두 정사각형(1:1). 남는 공간 안에서 가장 크게 맞춰요.
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .aspectRatio(1f)
                 .clip(RoundedCornerShape(24.dp))
                 .background(Color(0xFF2A2925)),
             contentAlignment = Alignment.Center,
@@ -152,9 +156,17 @@ fun CameraCapture(
                             val future = ProcessCameraProvider.getInstance(ctx)
                             future.addListener({
                                 val p = future.get()
+                                val rotation = ContextCompat.getDisplayOrDefault(ctx).rotation
                                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
+                                imageCapture.targetRotation = rotation
+                                // 뷰포트를 1:1로 고정하면 저장되는 JPEG도 같은 정사각형으로 잘려요.
+                                val group = UseCaseGroup.Builder()
+                                    .setViewPort(ViewPort.Builder(Rational(1, 1), rotation).build())
+                                    .addUseCase(preview)
+                                    .addUseCase(imageCapture)
+                                    .build()
                                 p.unbindAll()
-                                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group)
                                 provider = p
                             }, ContextCompat.getMainExecutor(ctx))
                         }
@@ -174,6 +186,7 @@ fun CameraCapture(
                     }
                 }
             }
+        }
         }
 
         if (!singleShot) {

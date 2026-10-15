@@ -16,12 +16,10 @@
 폰 브라우저로 저장소의 Releases 에 들어가 받으면 돼요. (처음 설치할 때 '출처를 알 수 없는 앱' 허용 필요)
 
 ## 칼로리 추정 켜기
-저장소 **Settings > Secrets and variables > Actions > New repository secret**
-- 이름: `ANTHROPIC_API_KEY`
-- 값: Anthropic API 키
+1. console.anthropic.com 에서 API 키를 만들어요 (크레딧 충전 필요).
+2. 앱 **설정 → 칼로리 추정 (Claude) → API 키**에 붙여넣으면, 키가 유효한지 확인한 뒤 저장돼요.
 
-키가 없으면 칼로리 추정만 꺼진 채로 나머지는 그대로 동작해요.
-키는 APK 안에 들어가므로 개인용으로만 쓰세요. 다른 사람에게 배포하려면 서버를 거쳐 호출하도록 바꿔야 해요.
+키는 폰 안(앱 전용 저장소)에만 저장되고 APK나 저장소엔 들어가지 않아요.
 
 ## 구조
 ```

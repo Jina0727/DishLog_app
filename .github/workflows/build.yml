@@ -23,15 +23,6 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      # 칼로리 추정용 키: 저장소 Settings > Secrets and variables > Actions 에 ANTHROPIC_API_KEY 로 넣어두면 켜져요.
-      - name: Write local.properties
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "anthropic.apiKey=$ANTHROPIC_API_KEY" > local.properties
-          fi
-
       - name: Build
         run: |
           set -o pipefail

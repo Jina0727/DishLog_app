@@ -23,6 +23,11 @@ class Prefs(context: Context) {
     var autoCamera: Boolean
         get() = sp.getBoolean("auto_camera", true)
         set(v) = sp.edit().putBoolean("auto_camera", v).apply()
+
+    /** 칼로리 추정용 Claude API 키. 폰 안(앱 전용 저장소)에만 저장돼요. */
+    var apiKey: String
+        get() = sp.getString("api_key", "").orEmpty()
+        set(v) = sp.edit().putString("api_key", v.trim()).apply()
 }
 
 object TagResolver {
@@ -50,9 +55,13 @@ class MealRepository(
     context: Context,
     private val db: AppDatabase,
     val prefs: Prefs,
-    private val estimator: CalorieEstimator?,
+    private val makeEstimator: (apiKey: String) -> CalorieEstimator,
     private val scope: CoroutineScope,
 ) {
+    /** 설정에 키가 있을 때만 추정기를 만들어요. 키를 바꾸면 다음 호출부터 바로 반영돼요. */
+    private val estimator: CalorieEstimator?
+        get() = prefs.apiKey.takeIf { it.isNotBlank() }?.let(makeEstimator)
+
     private val photoDir = File(context.filesDir, "photos").apply { mkdirs() }
 
     val hasEstimator: Boolean get() = estimator != null
@@ -73,10 +82,10 @@ class MealRepository(
             epochDay = zoned.toLocalDate().toEpochDay(),
             tag = tag,
             photos = photos.map { it.absolutePath },
-            estimateState = if (estimator != null) EstimateState.PENDING else EstimateState.NONE,
+            estimateState = if (hasEstimator) EstimateState.PENDING else EstimateState.NONE,
         )
         val saved = entry.copy(id = db.meals().insert(entry))
-        if (estimator != null) estimate(saved.id)
+        if (hasEstimator) estimate(saved.id)
         return saved
     }
 

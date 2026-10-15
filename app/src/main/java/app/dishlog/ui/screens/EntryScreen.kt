@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -89,29 +90,29 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
     var confirmDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(C.Ground)) {
-        Box(Modifier.fillMaxWidth().height(300.dp)) {
-            val pager = rememberPagerState { e.photos.size.coerceAtLeast(1) }
-            HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
-                Photo(e.photos.getOrNull(page), Modifier.fillMaxSize(), "${tagOf(e)} 사진 ${page + 1}")
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+                val pager = rememberPagerState { e.photos.size.coerceAtLeast(1) }
+                HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
+                    Photo(e.photos.getOrNull(page), Modifier.fillMaxSize(), "${tagOf(e)} 사진 ${page + 1}")
+                }
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.statusBarsPadding().padding(12.dp),
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.92f)),
+                ) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "뒤로", tint = C.Ink) }
+                if (e.photos.size > 1) {
+                    Text(
+                        "${pager.currentPage + 1} / ${e.photos.size}",
+                        color = Color.White, fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp)
+                            .clip(RoundedCornerShape(12.dp)).background(C.Ink.copy(alpha = 0.7f))
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
+                    )
+                }
             }
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.statusBarsPadding().padding(12.dp),
-                colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.92f)),
-            ) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "뒤로", tint = C.Ink) }
-            if (e.photos.size > 1) {
-                Text(
-                    "${pager.currentPage + 1} / ${e.photos.size}",
-                    color = Color.White, fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp)
-                        .clip(RoundedCornerShape(12.dp)).background(C.Ink.copy(alpha = 0.7f))
-                        .padding(horizontal = 9.dp, vertical = 3.dp),
-                )
-            }
-        }
-
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 22.dp),
+            Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             // 시간 + 칩
@@ -153,7 +154,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                     else -> Text(
                         when {
                             e.estimateState == EstimateState.FAILED -> "추정하지 못했어요"
-                            !repo.hasEstimator -> "칼로리 추정이 꺼져 있어요"
+                            !repo.hasEstimator -> "설정에서 Claude API 키를 넣으면 켜져요"
                             else -> "정보 없음"
                         },
                         fontSize = 14.sp, color = C.Muted,
@@ -170,6 +171,8 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                     color = if (e.note.isBlank()) C.Faint else C.Body,
                 )
             }
+        }
+
         }
 
         Row(

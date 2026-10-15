@@ -61,7 +61,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import app.dishlog.data.MealRepository
+import app.dishlog.estimate.ClaudeCalorieEstimator
 import app.dishlog.data.TimeSlot
 import app.dishlog.ui.LocalSlots
 import app.dishlog.ui.SectionTitle
@@ -81,6 +84,8 @@ fun SettingsScreen(repo: MealRepository, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<TimeSlot?>(null) }
     var nearest by remember { mutableStateOf(repo.prefs.outsideNearest) }
     var autoCamera by remember { mutableStateOf(repo.prefs.autoCamera) }
+    var apiKey by remember { mutableStateOf(repo.prefs.apiKey) }
+    var editingKey by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().background(C.Ground).verticalScroll(rememberScrollState())
@@ -152,15 +157,89 @@ fun SettingsScreen(repo: MealRepository, onBack: () -> Unit) {
             Text("바로 카메라 켜기", fontSize = 15.sp, color = C.Ink, modifier = Modifier.weight(1f))
             Switch(checked = autoCamera, onCheckedChange = { autoCamera = it; repo.prefs.autoCamera = it })
         }
-        if (!repo.hasEstimator) {
-            Text(
-                "칼로리 추정이 꺼져 있어요. API 키를 설정하면 켜져요 (README 참고).",
-                fontSize = 12.sp, color = C.Muted, modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-            )
+        SectionTitle("칼로리 추정 (Claude)", Modifier.padding(start = 4.dp, top = 14.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface)
+                .clickable { editingKey = true }.padding(horizontal = 16.dp).height(60.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("API 키", fontSize = 15.sp, color = C.Ink)
+                Text(
+                    if (apiKey.isBlank()) "연결 안 됨 · 눌러서 입력" else "연결됨 · …${apiKey.takeLast(4)}",
+                    fontSize = 12.sp, color = if (apiKey.isBlank()) C.Muted else C.Accent,
+                )
+            }
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = C.Muted)
         }
+        Text(
+            "키는 이 폰 안에만 저장돼요. 사진을 찍으면 Claude가 음식과 양을 보고 칼로리를 추정해요.",
+            fontSize = 12.sp, color = C.Muted, lineHeight = 18.sp, modifier = Modifier.padding(start = 4.dp),
+        )
     }
 
     editing?.let { slot -> SlotSheet(repo, slot, onDone = { editing = null }) }
+
+    if (editingKey) {
+        ApiKeyDialog(
+            current = apiKey,
+            onDismiss = { editingKey = false },
+            onSave = { repo.prefs.apiKey = it; apiKey = it; editingKey = false },
+        )
+    }
+}
+
+/** API 키 입력. 저장 전에 키가 유효한지 확인해요. */
+@Composable
+private fun ApiKeyDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var key by remember { mutableStateOf(current) }
+    var checking by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Claude API 키") },
+        text = {
+            val err = error
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("console.anthropic.com 에서 만든 키를 붙여넣어 주세요.", fontSize = 13.sp, color = C.Body)
+                OutlinedTextField(
+                    value = key,
+                    onValueChange = { key = it; error = null },
+                    placeholder = { Text("sk-ant-…") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    isError = err != null,
+                    supportingText = if (err != null) { { Text(err) } } else null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !checking,
+                onClick = {
+                    if (key.isBlank()) {
+                        onSave("")
+                    } else {
+                        checking = true
+                        scope.launch {
+                            val ok = ClaudeCalorieEstimator.verify(key)
+                            checking = false
+                            if (ok) onSave(key) else error = "키를 확인할 수 없어요. 다시 확인해 주세요."
+                        }
+                    }
+                },
+            ) { Text(if (checking) "확인 중…" else "저장") }
+        },
+        dismissButton = {
+            Row {
+                if (current.isNotBlank()) TextButton(onClick = { onSave("") }) { Text("연결 해제", color = Color(0xFFB3261E)) }
+                TextButton(onClick = onDismiss) { Text("취소") }
+            }
+        },
+    )
 }
 
 /** 하루 24시간 막대 위에 구간을 칠해서 한눈에 보여줘요. */
