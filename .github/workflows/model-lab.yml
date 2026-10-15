@@ -1,0 +1,52 @@
+name: Model lab
+
+# lab/run.txt 를 바꿔서 푸시하면 실험이 돌아요. 결과는 lab/results.md 로 커밋돼요.
+on:
+  push:
+    branches: [main]
+    paths: ["lab/run.txt"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: model-lab
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pillow
+
+      - name: Run experiment
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error title=Model lab::ANTHROPIC_API_KEY secret 이 없어요. 저장소 Settings > Secrets and variables > Actions 에 넣어주세요."
+            exit 1
+          fi
+          N=$(grep -oE 'n=[0-9]+' lab/run.txt | head -1 | cut -d= -f2)
+          python lab/run_lab.py --n "${N:-100}"
+
+      - name: Commit results
+        run: |
+          git config user.name "dishlog-lab"
+          git config user.email "dishlog-lab@users.noreply.github.com"
+          git add lab/results.md lab/results.csv lab/summary.txt
+          git commit -m "Model lab results" || exit 0
+          git push
+
+      - name: Report
+        if: always()
+        run: |
+          if [ -f lab/summary.txt ]; then
+            msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' lab/summary.txt)
+            echo "::notice title=Model lab::$msg"
+          fi
