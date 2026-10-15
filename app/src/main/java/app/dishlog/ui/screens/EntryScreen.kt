@@ -146,10 +146,17 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                             Text(total.grouped(), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = C.Ink)
                             Text(" kcal", fontSize = 13.sp, color = C.Muted, modifier = Modifier.padding(bottom = 4.dp))
                         }
-                        Text(
-                            e.items.joinToString("  ·  ") { "${it.name} ${it.kcal.grouped()}" },
-                            fontSize = 13.sp, color = C.Body, lineHeight = 20.sp,
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            e.items.forEach { item ->
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(item.name, fontSize = 14.sp, color = C.Ink)
+                                        if (item.note.isNotBlank()) Text(item.note, fontSize = 12.sp, color = C.Muted)
+                                    }
+                                    Text("${item.kcal.grouped()} kcal", fontSize = 14.sp, color = C.Body)
+                                }
+                            }
+                        }
                     }
                     else -> Text(
                         when {

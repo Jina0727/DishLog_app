@@ -97,26 +97,33 @@ class ClaudeCalorieEstimator(
         val items = JSONObject(text.substring(start, end + 1)).optJSONArray("items") ?: JSONArray()
         return List(items.length()) {
             val o = items.getJSONObject(it)
-            FoodItem(o.getString("name"), o.getInt("kcal"))
+            FoodItem(o.getString("name"), o.getInt("kcal"), o.optString("note"))
         }
     }
 
-    /** 긴 변을 1280px 정도로 줄여서 보내요 (속도·비용 절약). */
+    /** 긴 변을 2000px 로 맞춰 보내요. 포장지·영양성분표 글씨도 읽힐 만큼. */
     private fun encodeScaled(file: File): String {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1280) sample *= 2
-        val bmp = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE) sample *= 2
+        val decoded = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
             ?: throw IOException("사진을 열 수 없어요: ${file.name}")
+        val longSide = maxOf(decoded.width, decoded.height)
+        val bmp = if (longSide <= MAX_SIDE) decoded else {
+            val scale = MAX_SIDE.toFloat() / longSide
+            Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true)
+                .also { decoded.recycle() }
+        }
         val out = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.JPEG, 80, out)
+        bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
         bmp.recycle()
         return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     }
 
     companion object {
         const val MODEL = "claude-sonnet-5-5"
+        private const val MAX_SIDE = 2000
 
         /** 키가 유효한지 가볍게 확인해요 (모델 목록 조회, 사용량이 들지 않아요). */
         suspend fun verify(apiKey: String): Boolean = withContext(Dispatchers.IO) {
@@ -132,12 +139,19 @@ class ClaudeCalorieEstimator(
         }
 
         private const val PROMPT = """
-이 사진들은 한 끼 식사를 찍은 것이에요. 그릇이 여러 개이거나 여러 장에 나눠 찍혔을 수 있어요.
-같은 음식이 여러 장에 보이면 한 번만 세세요.
-보이는 음식마다 한국어 이름과, 사진에 보이는 양 기준 추정 칼로리(kcal, 정수)를 구하세요.
-그릇·수저 크기를 단서로 양을 가늠하세요.
+이 사진들은 한 사람이 한 번에 먹은 식사(또는 간식·음료)를 찍은 것이에요.
+그릇이 여러 개이거나 여러 장에 나눠 찍혔을 수 있어요. 같은 음식이 여러 장에 보이면 한 번만 세세요.
+
+음식·음료마다 한국어 이름과 실제로 먹는 양 기준 칼로리(kcal, 정수)를 구하세요.
+- 포장 제품이면 포장지·영양성분표에 적힌 칼로리를 가장 먼저 읽고 그대로 쓰세요. 제품명도 그대로 쓰세요.
+- 우유·물에 타 먹는 쉐이크, 끓여 먹는 라면처럼 먹는 방법이 정해진 제품은
+  포장지의 조리법(없으면 가장 일반적인 방법)대로 먹었다고 보고, 더해지는 재료(예: 우유 200ml)의 칼로리를
+  별도 항목으로 넣으세요.
+- 조리된 음식은 그릇·수저 크기를 단서로 양을 가늠하세요.
+- 각 항목의 note 에는 근거나 가정을 짧게 적으세요 (예: "포장지 표기", "우유 200ml 기준", "1공기 210g 추정").
+
 설명 없이 아래 JSON 형식으로만 답하세요. 음식이 없으면 items 를 빈 배열로 두세요.
-{"items":[{"name":"김치찌개","kcal":280},{"name":"쌀밥 1공기","kcal":300}]}
+{"items":[{"name":"단백질 쉐이크 파우치","kcal":158,"note":"포장지 표기"},{"name":"우유 200ml","kcal":130,"note":"조리법 기준 가정"}]}
 """
     }
 }

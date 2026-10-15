@@ -21,8 +21,8 @@ import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** 사진으로 인식한 음식 하나. kcal 은 '보통' 양 기준 추정치. */
-data class FoodItem(val name: String, val kcal: Int)
+/** 사진으로 인식한 음식 하나. note: 근거·가정 (예: "포장지 표기", "우유 200ml 기준") */
+data class FoodItem(val name: String, val kcal: Int, val note: String = "")
 
 enum class EstimateState { NONE, PENDING, DONE, FAILED }
 
@@ -92,7 +92,7 @@ class Converters {
 
     @TypeConverter
     fun itemsToJson(v: List<FoodItem>): String = JSONArray().apply {
-        v.forEach { put(JSONObject().put("name", it.name).put("kcal", it.kcal)) }
+        v.forEach { put(JSONObject().put("name", it.name).put("kcal", it.kcal).put("note", it.note)) }
     }.toString()
 
     @TypeConverter
@@ -100,7 +100,7 @@ class Converters {
         val a = JSONArray(v)
         return List(a.length()) {
             val o = a.getJSONObject(it)
-            FoodItem(o.getString("name"), o.getInt("kcal"))
+            FoodItem(o.getString("name"), o.getInt("kcal"), o.optString("note"))
         }
     }
 }
