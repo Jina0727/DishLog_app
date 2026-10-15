@@ -124,6 +124,18 @@ class MealRepository(
         }
     }
 
+    /**
+     * 계산 도중 앱이 꺼져 '계산 중'에 멈춘 기록을 다시 계산해요. 앱이 켜질 때 한 번 불러요.
+     * 키가 없으면 계산 중 표시만 풀어요.
+     */
+    fun resumePending() {
+        scope.launch {
+            db.meals().pending().forEach {
+                if (hasEstimator) estimate(it.id) else db.meals().update(it.copy(estimateState = EstimateState.NONE))
+            }
+        }
+    }
+
     suspend fun update(e: MealEntry) = db.meals().update(e)
 
     suspend fun setTime(e: MealEntry, takenAt: Long) {

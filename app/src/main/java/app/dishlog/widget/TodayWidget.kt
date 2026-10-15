@@ -39,7 +39,12 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import app.dishlog.DishlogApp
 import app.dishlog.R
+import app.dishlog.data.MealRepository
 import app.dishlog.data.decodeUpright
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.map
 import app.dishlog.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,18 +73,27 @@ private val WIDE = DpSize(320.dp, 56.dp)
 class TodayWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(NARROW, MEDIUM, WIDE))
 
+    /** 위젯에 그릴 값 한 묶음. 최근 사진은 작은 정사각형 썸네일로 미리 만들어 둬요. */
+    private class Data(val s: MealRepository.DaySummary, val thumbs: List<Bitmap>)
+
+    private suspend fun load(repo: MealRepository): Data = withContext(Dispatchers.IO) {
+        val s = repo.todaySummary()
+        Data(s, s.photos.takeLast(MAX_THUMBS).mapNotNull(::thumbnail))
+    }
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repo = (context.applicationContext as DishlogApp).repo
-        val s = repo.todaySummary()
-        // 최근 사진만, 위젯 용량을 아끼려고 작은 정사각형으로 잘라서 넣어요.
-        val recent = withContext(Dispatchers.IO) { s.photos.takeLast(MAX_THUMBS).mapNotNull(::thumbnail) }
+        val first = load(repo)
         provideContent {
+            // 위젯이 켜져 있는 동안에도 기록이 바뀔 때마다 다시 읽어요 (칼로리 계산 완료 포함).
+            val data by remember { repo.mealsChanged.map { load(repo) } }.collectAsState(first)
+            val s = data.s
             val slots = when {
                 LocalSize.current.width >= WIDE.width -> 4
                 LocalSize.current.width >= MEDIUM.width -> 3
                 else -> 2
             }
-            Content(recent.takeLast(slots), slots, (s.photos.size - slots).coerceAtLeast(0), s.kcal, s.pending)
+            Content(data.thumbs.takeLast(slots), slots, (s.photos.size - slots).coerceAtLeast(0), s.kcal, s.pending)
         }
     }
 

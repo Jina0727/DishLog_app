@@ -113,6 +113,9 @@ interface MealDao {
     @Query("SELECT * FROM meals WHERE epochDay = :day ORDER BY takenAt")
     suspend fun dayOnce(day: Long): List<MealEntry>
 
+    @Query("SELECT * FROM meals WHERE estimateState = 'PENDING'")
+    suspend fun pending(): List<MealEntry>
+
     /** 기록 테이블이 바뀔 때마다 값을 내보내요 (위젯 갱신 신호로 사용). */
     @Query("SELECT COUNT(*) FROM meals")
     fun observeCount(): Flow<Int>

@@ -25,6 +25,7 @@ class DishlogApp : Application() {
             makeEstimator = { key -> ClaudeCalorieEstimator(key, ClaudeCalorieEstimator.MODEL) },
             scope = appScope,
         )
+        repo.resumePending()
         // 기록이 바뀌면 '오늘' 위젯 숫자를 바로 갱신해요.
         appScope.launch {
             repo.mealsChanged.collect { runCatching { TodayWidget().updateAll(this@DishlogApp) } }
