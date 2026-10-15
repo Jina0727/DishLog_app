@@ -1,0 +1,53 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      # 칼로리 추정용 키: 저장소 Settings > Secrets and variables > Actions 에 ANTHROPIC_API_KEY 로 넣어두면 켜져요.
+      - name: Write local.properties
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "anthropic.apiKey=$ANTHROPIC_API_KEY" > local.properties
+          fi
+
+      - name: Build
+        run: gradle :app:assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dishlog-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      # 폰에서 바로 받을 수 있게 'latest' 릴리스에 APK 를 올려요 (매 빌드마다 교체).
+      - name: Publish latest APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Dishlog.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Dishlog.apk \
+            --title "Dishlog 최신 빌드 #${{ github.run_number }}" \
+            --notes "커밋 ${GITHUB_SHA::7} 에서 빌드됨. 폰에서 Dishlog.apk 를 받아 설치하세요." \
+            --prerelease
