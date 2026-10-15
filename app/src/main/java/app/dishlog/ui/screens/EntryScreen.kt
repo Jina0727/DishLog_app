@@ -88,6 +88,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
     var editing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var askHint by remember { mutableStateOf(false) }
+    var labOpen by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(C.Ground)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -132,6 +133,9 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SectionTitle("추정 칼로리", Modifier.weight(1f))
                     if (repo.hasEstimator && e.estimateState != EstimateState.PENDING) {
+                        TextButton(onClick = { labOpen = true }) {
+                            Text("모델 비교", fontSize = 13.sp, color = C.Muted)
+                        }
                         TextButton(onClick = { askHint = true }) {
                             Text(if (e.items.isEmpty()) "추정하기" else "다시 추정", fontSize = 13.sp, color = C.Accent)
                         }
@@ -211,6 +215,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
     }
 
     if (editing) EditSheet(repo, e, onDone = { editing = false })
+    if (labOpen) ModelLabSheet(repo, e, onDone = { labOpen = false })
 
     if (askHint) {
         HintDialog(

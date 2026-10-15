@@ -1,7 +1,6 @@
 package app.dishlog.estimate
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.Base64
 import app.dishlog.data.FoodItem
 import app.dishlog.data.decodeUpright
@@ -32,9 +31,16 @@ interface CalorieEstimator {
 class ClaudeCalorieEstimator(
     private val apiKey: String,
     private val model: String,
+    /** 보내는 사진의 긴 변(px). 클수록 글씨를 잘 읽지만 토큰(비용)이 늘어요. */
+    private val maxSide: Int = 2000,
 ) : CalorieEstimator {
 
-    override suspend fun estimate(photos: List<File>, hint: String): List<FoodItem> = withContext(Dispatchers.IO) {
+    /** 추정 결과 + 실제 사용량 (모델 비교 실험용). */
+    data class Run(val items: List<FoodItem>, val inputTokens: Int, val outputTokens: Int)
+
+    override suspend fun estimate(photos: List<File>, hint: String): List<FoodItem> = run(photos, hint).items
+
+    suspend fun run(photos: List<File>, hint: String): Run = withContext(Dispatchers.IO) {
         val content = JSONArray()
         photos.forEach { f ->
             content.put(
@@ -85,7 +91,8 @@ class ClaudeCalorieEstimator(
                     if (b.optString("type") == "text") append(b.getString("text"))
                 }
             }
-            parse(text)
+            val usage = resp.optJSONObject("usage")
+            Run(parse(text), usage?.optInt("input_tokens") ?: 0, usage?.optInt("output_tokens") ?: 0)
         } finally {
             conn.disconnect()
         }
@@ -102,14 +109,14 @@ class ClaudeCalorieEstimator(
         }
     }
 
-    /** 긴 변을 2000px 로 맞춰 보내요. 포장지·영양성분표 글씨도 읽힐 만큼. */
+    /** 긴 변을 maxSide 로 맞춰 보내요. 기본 2000px 은 포장지·영양성분표 글씨도 읽힐 만큼. */
     private fun encodeScaled(file: File): String {
         // 회전 정보(EXIF)를 반영해 바로 선 사진으로 보내요.
-        val decoded = decodeUpright(file.absolutePath, MAX_SIDE / 2)
+        val decoded = decodeUpright(file.absolutePath, maxSide / 2)
             ?: throw IOException("사진을 열 수 없어요: ${file.name}")
         val longSide = maxOf(decoded.width, decoded.height)
-        val bmp = if (longSide <= MAX_SIDE) decoded else {
-            val scale = MAX_SIDE.toFloat() / longSide
+        val bmp = if (longSide <= maxSide) decoded else {
+            val scale = maxSide.toFloat() / longSide
             Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true)
                 .also { decoded.recycle() }
         }
@@ -121,7 +128,15 @@ class ClaudeCalorieEstimator(
 
     companion object {
         const val MODEL = "claude-sonnet-5-5"
-        private const val MAX_SIDE = 2000
+        const val MODEL_HAIKU = "claude-haiku-5-5"
+
+        /** 100만 토큰당 달러 (입력, 출력) */
+        val PRICES = mapOf(MODEL to (2.0 to 10.0), MODEL_HAIKU to (0.10 to 0.50))
+
+        fun costUsd(model: String, inputTokens: Int, outputTokens: Int): Double {
+            val (inP, outP) = PRICES[model] ?: return 0.0
+            return inputTokens * inP / 1_000_000 + outputTokens * outP / 1_000_000
+        }
 
         /** 키가 유효한지 가볍게 확인해요 (모델 목록 조회, 사용량이 들지 않아요). */
         suspend fun verify(apiKey: String): Boolean = withContext(Dispatchers.IO) {
