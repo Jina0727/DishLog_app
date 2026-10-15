@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -22,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -93,7 +96,9 @@ fun EntryChips(e: MealEntry, modifier: Modifier = Modifier) {
 }
 
 /**
- * 목록 카드. 위계: [태그 칩 ····· 시간] → 음식 이름(굵게) → [칼로리 ····· 포만도].
+ * 타임라인 카드 (시간은 카드 밖 왼쪽 축에 따로 표시해요).
+ * [사진] [태그 칩 ····· 포만도]
+ *        [칼로리 크게]
  * 사진이 여러 장이면 사진 모서리에 작은 숫자 배지.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -102,43 +107,36 @@ fun EntryCard(e: MealEntry, onClick: () -> Unit, onLongClick: (() -> Unit)? = nu
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(C.Surface)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "수정·삭제 메뉴")
-            .padding(10.dp),
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box {
-            Photo(e.photos.firstOrNull(), Modifier.size(92.dp).clip(RoundedCornerShape(16.dp)), "${tagOf(e)} 사진")
+            Photo(e.photos.firstOrNull(), Modifier.size(72.dp).clip(RoundedCornerShape(13.dp)), "${tagOf(e)} ${e.takenAt.hhmm()} 사진")
             if (e.photos.size > 1) {
                 Text(
                     "${e.photos.size}",
                     color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                    modifier = Modifier.align(Alignment.TopEnd).padding(5.dp)
                         .clip(RoundedCornerShape(8.dp)).background(C.Ink.copy(alpha = 0.6f))
-                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
                 )
             }
         }
         Column(
-            Modifier.weight(1f).height(92.dp).padding(start = 14.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            Modifier.weight(1f).padding(start = 12.dp, end = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TagChip(e.tag)
                 Spacer(Modifier.weight(1f))
-                Text(e.takenAt.hhmm(), fontSize = 13.sp, color = C.Muted)
+                e.fullness?.let { f ->
+                    LevelDots(f, C.Muted)
+                    Text(" ${FULLNESS_LABELS[f]}", fontSize = 12.sp, color = C.Muted)
+                }
             }
-
-            val title = e.items.joinToString(", ") { it.name }.ifBlank { e.note }
-            Text(
-                title.ifBlank { "음식 정보 없음" },
-                fontSize = 15.sp,
-                fontWeight = if (title.isBlank()) FontWeight.Normal else FontWeight.SemiBold,
-                color = if (title.isBlank()) C.Faint else C.Ink,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val kcal = e.totalKcal()
                 when {
@@ -147,18 +145,36 @@ fun EntryCard(e: MealEntry, onClick: () -> Unit, onLongClick: (() -> Unit)? = nu
                         Text("  계산 중", fontSize = 13.sp, color = C.Muted)
                     }
                     kcal != null -> {
-                        Text(kcal.grouped(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = C.Ink)
-                        Text(" kcal", fontSize = 12.sp, color = C.Muted)
+                        Text(kcal.grouped(), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = C.Ink)
+                        Text(" kcal", fontSize = 12.sp, color = C.Muted, modifier = Modifier.padding(top = 3.dp))
                     }
                     else -> Text("칼로리 –", fontSize = 13.sp, color = C.Faint)
                 }
-                Spacer(Modifier.weight(1f))
-                e.fullness?.let { f ->
-                    LevelDots(f, C.Muted)
-                    Text(" ${FULLNESS_LABELS[f]}", fontSize = 12.sp, color = C.Muted)
-                }
             }
         }
+    }
+}
+
+/** 타임라인 한 줄: 왼쪽에 시간, 다음 기록까지 세로선으로 이어져요. */
+@Composable
+fun TimelineRow(time: String, last: Boolean, content: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().drawBehind {
+            if (!last) {
+                val x = 24.dp.toPx()
+                drawLine(
+                    color = C.Border,
+                    start = Offset(x, 30.dp.toPx()),
+                    end = Offset(x, size.height + 10.dp.toPx()),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+        },
+    ) {
+        Box(Modifier.width(48.dp).padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
+            Text(time, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Ink)
+        }
+        Box(Modifier.weight(1f)) { content() }
     }
 }
 

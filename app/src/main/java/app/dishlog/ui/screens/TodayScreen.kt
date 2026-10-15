@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -69,6 +69,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dishlog.data.MealRepository
 import app.dishlog.data.totalKcal
 import app.dishlog.ui.Photo
+import app.dishlog.ui.TimelineRow
 import app.dishlog.ui.grouped
 import app.dishlog.ui.hhmm
 import app.dishlog.ui.koreanLong
@@ -115,8 +116,8 @@ fun TodayScreen(
         .collectAsStateWithLifecycle(emptyList())
     val loggedSet = logged.toSet()
 
+    // 날짜를 골라도 달력은 펼친 그대로 둬요. 접는 건 위로 올리거나 손잡이를 눌렀을 때만.
     fun pick(d: LocalDate) {
-        expanded = false
         scope.launch { pager.animateScrollToPage(pageOf(d)) }
     }
 
@@ -303,7 +304,11 @@ private fun DayPage(repo: MealRepository, date: LocalDate, today: LocalDate, pho
         ) {
             item { summary() }
             if (entries.isEmpty()) item { empty() }
-            items(entries, key = { it.id }) { e -> ActionableEntryCard(repo, e) { onOpenEntry(e.id) } }
+            itemsIndexed(entries, key = { _, e -> e.id }) { i, e ->
+                TimelineRow(e.takenAt.hhmm(), last = i == entries.lastIndex) {
+                    ActionableEntryCard(repo, e) { onOpenEntry(e.id) }
+                }
+            }
         }
     }
 }
