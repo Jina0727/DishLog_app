@@ -40,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dishlog.data.FULLNESS_LABELS
-import app.dishlog.data.PORTION_LABELS
 import app.dishlog.data.TimeSlot
 import app.dishlog.ui.theme.C
 
@@ -91,13 +90,11 @@ fun TagChip(tag: String?, modifier: Modifier = Modifier, selected: Boolean? = nu
     )
 }
 
-/** 먹은 양 / 포만도 칩. ●●○ 점 세 개로 정도를 보여줘요. */
+/** 포만도 칩. ●●○ 점 세 개로 정도를 보여줘요. */
 @Composable
-fun LevelChip(kind: String, level: Int, modifier: Modifier = Modifier, selected: Boolean? = null, onClick: (() -> Unit)? = null) {
-    val labels = if (kind == "portion") PORTION_LABELS else FULLNESS_LABELS
-    val prefix = if (kind == "portion") "양" else "포만"
+fun FullnessChip(level: Int, modifier: Modifier = Modifier, selected: Boolean? = null, onClick: (() -> Unit)? = null) {
     Chip(
-        label = if (selected == null) "$prefix ${labels[level]}" else labels[level],
+        label = if (selected == null) "포만 ${FULLNESS_LABELS[level]}" else FULLNESS_LABELS[level],
         bg = Color(0xFFEEEEEA), fg = C.Body,
         leading = { LevelDots(level, C.Body) },
         selected = selected, onClick = onClick, modifier = modifier,

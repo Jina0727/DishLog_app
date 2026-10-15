@@ -75,14 +75,13 @@ fun Photo(path: String?, modifier: Modifier, contentDescription: String?) {
     }
 }
 
-/** 기록에 붙은 칩들: 태그 · 먹은 양 · 포만도 (고른 것만). */
+/** 기록에 붙은 칩들: 태그 · 포만도 (고른 것만). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EntryChips(e: MealEntry, modifier: Modifier = Modifier) {
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         TagChip(e.tag)
-        if (e.portion in 0..2) LevelChip("portion", e.portion)
-        e.fullness?.let { LevelChip("fullness", it) }
+        e.fullness?.let { FullnessChip(it) }
     }
 }
 

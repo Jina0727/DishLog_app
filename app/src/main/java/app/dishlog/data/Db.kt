@@ -20,19 +20,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlin.math.roundToInt
 
 /** 사진으로 인식한 음식 하나. kcal 은 '보통' 양 기준 추정치. */
 data class FoodItem(val name: String, val kcal: Int)
 
 enum class EstimateState { NONE, PENDING, DONE, FAILED }
 
-/** 먹은 양 배율: 적게 / 보통 / 많이. 선택 안 함(-1)은 보통으로 계산. */
-val PORTION_MULT = listOf(0.7, 1.0, 1.3)
-val PORTION_LABELS = listOf("적게", "보통", "많이")
 val FULLNESS_LABELS = listOf("덜 참", "적당", "배부름")
-
-fun portionMult(p: Int): Double = if (p in 0..2) PORTION_MULT[p] else 1.0
 
 @Entity(tableName = "meals", indices = [Index("epochDay")])
 data class MealEntry(
@@ -44,18 +38,16 @@ data class MealEntry(
     val note: String = "",
     val items: List<FoodItem> = emptyList(),
     val estimateState: EstimateState = EstimateState.NONE,
-    /** -1 = 선택 안 함, 0..2 = 적게/보통/많이 */
+    /** (사용 안 함) 예전 '먹은 양' 값. 칼로리는 hint 로 보정해요. */
     val portion: Int = -1,
     /** null = 선택 안 함, 0..2 = 덜 참/적당/배부름 */
     val fullness: Int? = null,
+    /** 칼로리 추정 때 Claude 에게 같이 보내는 말 (예: "밥은 반 공기만 먹음") */
+    val hint: String = "",
 )
 
-/** 먹은 양까지 반영한 총 추정 칼로리. 추정 결과가 없으면 null. */
-fun MealEntry.totalKcal(): Int? =
-    if (items.isEmpty()) null
-    else (items.sumOf { it.kcal } * portionMult(portion)).roundToInt()
-
-fun FoodItem.adjustedKcal(portion: Int): Int = (kcal * portionMult(portion)).roundToInt()
+/** 총 추정 칼로리. 추정 결과가 없으면 null. */
+fun MealEntry.totalKcal(): Int? = if (items.isEmpty()) null else items.sumOf { it.kcal }
 
 /**
  * 사용자가 정한 식사 구간. 분 단위(0~1439). end < start 이면 자정을 넘는 구간.
@@ -79,6 +71,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("UPDATE slots SET color = 0, icon = 'rice' WHERE name = '점심'")
         db.execSQL("UPDATE slots SET color = 1, icon = 'coffee' WHERE name = '간식'")
         db.execSQL("UPDATE slots SET color = 2, icon = 'dinner' WHERE name = '저녁'")
+    }
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE meals ADD COLUMN hint TEXT NOT NULL DEFAULT ''")
     }
 }
 
@@ -146,7 +144,7 @@ interface SlotDao {
     suspend fun delete(s: TimeSlot)
 }
 
-@Database(entities = [MealEntry::class, TimeSlot::class], version = 2, exportSchema = false)
+@Database(entities = [MealEntry::class, TimeSlot::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun meals(): MealDao
@@ -164,7 +162,7 @@ abstract class AppDatabase : RoomDatabase() {
                         )
                     }
                 })
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

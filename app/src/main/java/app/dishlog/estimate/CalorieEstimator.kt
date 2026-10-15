@@ -15,8 +15,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 interface CalorieEstimator {
-    /** 한 끼에 찍은 사진들(여러 장 가능)을 받아 음식별 추정 칼로리를 돌려줘요. */
-    suspend fun estimate(photos: List<File>): List<FoodItem>
+    /**
+     * 한 끼에 찍은 사진들(여러 장 가능)을 받아 음식별 추정 칼로리를 돌려줘요.
+     * hint: 사용자가 덧붙인 말 (예: "밥은 반 공기만 먹음"). 사진보다 우선해요.
+     */
+    suspend fun estimate(photos: List<File>, hint: String = ""): List<FoodItem>
 }
 
 /**
@@ -30,7 +33,7 @@ class ClaudeCalorieEstimator(
     private val model: String,
 ) : CalorieEstimator {
 
-    override suspend fun estimate(photos: List<File>): List<FoodItem> = withContext(Dispatchers.IO) {
+    override suspend fun estimate(photos: List<File>, hint: String): List<FoodItem> = withContext(Dispatchers.IO) {
         val content = JSONArray()
         photos.forEach { f ->
             content.put(
@@ -44,7 +47,13 @@ class ClaudeCalorieEstimator(
                     )
             )
         }
-        content.put(JSONObject().put("type", "text").put("text", PROMPT))
+        val prompt = if (hint.isBlank()) PROMPT else PROMPT + """
+
+사용자 메모: "${hint.trim()}"
+이 메모는 사진보다 우선해요. 남긴 양, 덜 먹은 양, 사진에 안 보이는 음식·음료가 적혀 있으면
+실제로 먹은 만큼으로 칼로리를 고치고, 음식 이름에도 반영하세요 (예: "쌀밥 반 공기").
+"""
+        content.put(JSONObject().put("type", "text").put("text", prompt))
 
         val body = JSONObject()
             .put("model", model)

@@ -58,11 +58,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dishlog.data.EstimateState
 import app.dishlog.data.MealEntry
 import app.dishlog.data.MealRepository
-import app.dishlog.data.adjustedKcal
 import app.dishlog.data.minuteOfDay
 import app.dishlog.data.totalKcal
 import app.dishlog.ui.EntryChips
-import app.dishlog.ui.LevelChip
+import app.dishlog.ui.FullnessChip
 import app.dishlog.ui.LocalSlots
 import app.dishlog.ui.Photo
 import app.dishlog.ui.SectionTitle
@@ -88,6 +87,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
     val e = entry ?: return
     var editing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var askHint by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(C.Ground)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -132,7 +132,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SectionTitle("추정 칼로리", Modifier.weight(1f))
                     if (repo.hasEstimator && e.estimateState != EstimateState.PENDING) {
-                        TextButton(onClick = { repo.estimate(e.id) }) {
+                        TextButton(onClick = { askHint = true }) {
                             Text(if (e.items.isEmpty()) "추정하기" else "다시 추정", fontSize = 13.sp, color = C.Accent)
                         }
                     }
@@ -147,7 +147,7 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                             Text(" kcal", fontSize = 13.sp, color = C.Muted, modifier = Modifier.padding(bottom = 4.dp))
                         }
                         Text(
-                            e.items.joinToString("  ·  ") { "${it.name} ${it.adjustedKcal(e.portion).grouped()}" },
+                            e.items.joinToString("  ·  ") { "${it.name} ${it.kcal.grouped()}" },
                             fontSize = 13.sp, color = C.Body, lineHeight = 20.sp,
                         )
                     }
@@ -159,6 +159,9 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
                         },
                         fontSize = 14.sp, color = C.Muted,
                     )
+                }
+                if (e.hint.isNotBlank()) {
+                    Text("“${e.hint}” 반영", fontSize = 12.sp, color = C.Muted)
                 }
             }
 
@@ -202,6 +205,14 @@ fun EntryScreen(repo: MealRepository, id: Long, onBack: () -> Unit) {
 
     if (editing) EditSheet(repo, e, onDone = { editing = false })
 
+    if (askHint) {
+        HintDialog(
+            initial = e.hint,
+            onDismiss = { askHint = false },
+            onEstimate = { hint -> askHint = false; repo.estimate(e.id, hint) },
+        )
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -228,7 +239,6 @@ private fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
     val slots = LocalSlots.current
     var tag by remember { mutableStateOf(e.tag) }
     var minute by remember { mutableIntStateOf(minuteOfDay(e.takenAt)) }
-    var portion by remember { mutableIntStateOf(e.portion) }
     var fullness by remember { mutableStateOf(e.fullness) }
     var note by remember { mutableStateOf(e.note) }
 
@@ -253,19 +263,10 @@ private fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionTitle("먹은 양")
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (0..2).forEach { i ->
-                        LevelChip("portion", i, selected = portion == i, onClick = { portion = if (portion == i) -1 else i })
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionTitle("포만도")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     (0..2).forEach { i ->
-                        LevelChip("fullness", i, selected = fullness == i, onClick = { fullness = if (fullness == i) null else i })
+                        FullnessChip(i, selected = fullness == i, onClick = { fullness = if (fullness == i) null else i })
                     }
                 }
             }
@@ -291,7 +292,7 @@ private fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
                         val zoned = Instant.ofEpochMilli(e.takenAt).atZone(ZoneId.systemDefault())
                         val takenAt = zoned.withHour(minute / 60).withMinute(minute % 60).toInstant().toEpochMilli()
                         scope.launch {
-                            repo.update(e.copy(tag = tag, takenAt = takenAt, portion = portion, fullness = fullness, note = note))
+                            repo.update(e.copy(tag = tag, takenAt = takenAt, fullness = fullness, note = note))
                             sheet.hide()
                             onDone()
                         }
@@ -304,4 +305,31 @@ private fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+/** 추정 전에 Claude 에게 덧붙일 말. 비워도 돼요. */
+@Composable
+private fun HintDialog(initial: String, onDismiss: () -> Unit, onEstimate: (String) -> Unit) {
+    var hint by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("칼로리 추정") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "남긴 음식이나 사진에 안 보이는 것을 적어주면 더 정확해져요.",
+                    fontSize = 13.sp, color = C.Body, lineHeight = 19.sp,
+                )
+                OutlinedTextField(
+                    value = hint,
+                    onValueChange = { hint = it },
+                    placeholder = { Text("예: 밥은 반 공기만 먹음, 라떼 한 잔 추가") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onEstimate(hint) }) { Text("추정하기") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
 }

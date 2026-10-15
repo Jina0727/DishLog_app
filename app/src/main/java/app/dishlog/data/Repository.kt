@@ -90,12 +90,14 @@ class MealRepository(
     }
 
     /** 칼로리 추정은 앱 전역 스코프에서 돌아서, 위젯 촬영 창이 닫혀도 계속 진행돼요. */
-    fun estimate(entryId: Long) {
+    /** hint 를 주면 기록에 저장하고 그걸 같이 보내요. null 이면 저장된 hint 를 그대로 써요. */
+    fun estimate(entryId: Long, hint: String? = null) {
         val est = estimator ?: return
         scope.launch {
-            val current = db.meals().get(entryId) ?: return@launch
-            db.meals().update(current.copy(estimateState = EstimateState.PENDING))
-            val result = runCatching { est.estimate(current.photos.map(::File)) }
+            val saved = db.meals().get(entryId) ?: return@launch
+            val current = saved.copy(estimateState = EstimateState.PENDING, hint = hint?.trim() ?: saved.hint)
+            db.meals().update(current)
+            val result = runCatching { est.estimate(current.photos.map(::File), current.hint) }
             val latest = db.meals().get(entryId) ?: return@launch
             db.meals().update(
                 latest.copy(
