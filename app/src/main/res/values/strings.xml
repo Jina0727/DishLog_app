@@ -3,6 +3,8 @@
     <string name="app_name">Dishlog</string>
     <string name="widget_label">Dishlog 기록</string>
     <string name="widget_description">누르면 바로 식사를 찍어요</string>
+    <string name="today_widget_label">Dishlog 오늘</string>
+    <string name="today_widget_description">오늘 칼로리와 찍기 버튼</string>
     <string name="shortcut_capture_short">바로 찍기</string>
     <string name="shortcut_capture_long">식사 바로 찍기</string>
 </resources>

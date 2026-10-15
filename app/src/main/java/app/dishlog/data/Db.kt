@@ -110,6 +110,13 @@ interface MealDao {
     @Query("SELECT * FROM meals WHERE epochDay = :day ORDER BY takenAt")
     fun observeDay(day: Long): Flow<List<MealEntry>>
 
+    @Query("SELECT * FROM meals WHERE epochDay = :day ORDER BY takenAt")
+    suspend fun dayOnce(day: Long): List<MealEntry>
+
+    /** 기록 테이블이 바뀔 때마다 값을 내보내요 (위젯 갱신 신호로 사용). */
+    @Query("SELECT COUNT(*) FROM meals")
+    fun observeCount(): Flow<Int>
+
     @Query("SELECT DISTINCT epochDay FROM meals WHERE epochDay BETWEEN :from AND :to")
     fun observeDaysWithEntries(from: Long, to: Long): Flow<List<Long>>
 

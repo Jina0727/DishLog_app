@@ -73,6 +73,20 @@ class MealRepository(
     fun daysWithEntries(from: Long, to: Long): Flow<List<Long>> = db.meals().observeDaysWithEntries(from, to)
     fun entry(id: Long): Flow<MealEntry?> = db.meals().observe(id)
 
+    /** 기록이 추가·수정·삭제될 때마다 신호가 와요. 위젯 갱신에 써요. */
+    val mealsChanged: Flow<Int> = db.meals().observeCount()
+
+    data class DaySummary(val count: Int, val kcal: Int, val pending: Boolean)
+
+    suspend fun todaySummary(): DaySummary {
+        val list = db.meals().dayOnce(java.time.LocalDate.now().toEpochDay())
+        return DaySummary(
+            count = list.size,
+            kcal = list.mapNotNull { it.totalKcal() }.sum(),
+            pending = list.any { it.estimateState == EstimateState.PENDING },
+        )
+    }
+
     /** 찍은 사진들로 기록 하나를 만들고, 찍은 시간에 맞는 구간 태그를 자동으로 붙여요. */
     suspend fun createEntry(photos: List<File>, takenAt: Long = System.currentTimeMillis()): MealEntry {
         val zoned = Instant.ofEpochMilli(takenAt).atZone(ZoneId.systemDefault())
