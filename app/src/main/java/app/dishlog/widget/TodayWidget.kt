@@ -9,6 +9,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalSize
+import androidx.glance.appwidget.SizeMode
+import androidx.compose.ui.unit.DpSize
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.actionStartActivity
@@ -48,26 +51,39 @@ private val Accent = Color(0xFF2F5D46)
 private val Surface = Color(0xFFFFFFFF)
 private val Slot = Color(0xFFEEEEEA)
 
-private const val THUMBS = 3
+private const val MAX_THUMBS = 4
 private const val THUMB_PX = 144
 
+/** 위젯 폭별 사진 칸 수: 3×1 → 2장, 4×1 → 3장, 5×1 → 4장 */
+private val NARROW = DpSize(180.dp, 56.dp)
+private val MEDIUM = DpSize(250.dp, 56.dp)
+private val WIDE = DpSize(320.dp, 56.dp)
+
 /**
- * Dishlog 위젯 (4×1).
- * [오늘 사진 썸네일 최대 3장 · 빈 칸] ····· [칼로리] [둥근 찍기 버튼]
+ * Dishlog 위젯 (3×1 ~ 5×1, 크기 조절 가능).
+ * [오늘 사진 썸네일 · 빈 칸] ····· [칼로리] [둥근 찍기 버튼]
  * 왼쪽을 누르면 앱, 오른쪽 버튼을 누르면 촬영 창이 열려요.
  */
 class TodayWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Responsive(setOf(NARROW, MEDIUM, WIDE))
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repo = (context.applicationContext as DishlogApp).repo
         val s = repo.todaySummary()
-        // 최근 3장만, 위젯 용량을 아끼려고 작은 정사각형으로 잘라서 넣어요.
-        val thumbs = withContext(Dispatchers.IO) { s.photos.takeLast(THUMBS).mapNotNull(::thumbnail) }
-        val extra = (s.photos.size - THUMBS).coerceAtLeast(0)
-        provideContent { Content(thumbs, extra, s.kcal, s.pending) }
+        // 최근 사진만, 위젯 용량을 아끼려고 작은 정사각형으로 잘라서 넣어요.
+        val recent = withContext(Dispatchers.IO) { s.photos.takeLast(MAX_THUMBS).mapNotNull(::thumbnail) }
+        provideContent {
+            val slots = when {
+                LocalSize.current.width >= WIDE.width -> 4
+                LocalSize.current.width >= MEDIUM.width -> 3
+                else -> 2
+            }
+            Content(recent.takeLast(slots), slots, (s.photos.size - slots).coerceAtLeast(0), s.kcal, s.pending)
+        }
     }
 
     @Composable
-    private fun Content(thumbs: List<Bitmap>, extra: Int, kcal: Int, pending: Boolean) {
+    private fun Content(thumbs: List<Bitmap>, slots: Int, extra: Int, kcal: Int, pending: Boolean) {
         Row(
             modifier = GlanceModifier.fillMaxSize().cornerRadius(26.dp).background(Surface).padding(start = 12.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -76,7 +92,7 @@ class TodayWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.defaultWeight().fillMaxHeight().clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                for (i in 0 until THUMBS) {
+                for (i in 0 until slots) {
                     val bmp = thumbs.getOrNull(i)
                     if (bmp != null) {
                         Box(contentAlignment = Alignment.TopEnd) {
@@ -86,7 +102,7 @@ class TodayWidget : GlanceAppWidget() {
                                 contentScale = ContentScale.Crop,
                                 modifier = GlanceModifier.size(48.dp).cornerRadius(12.dp),
                             )
-                            if (i == 0 && extra > 0) { // 3장보다 많으면 첫 칸에 "+N"
+                            if (i == 0 && extra > 0) { // 칸보다 많으면 첫 칸에 "+N"
                                 Box(
                                     modifier = GlanceModifier.size(48.dp).cornerRadius(12.dp).background(Color(0x99161616)),
                                     contentAlignment = Alignment.Center,
@@ -99,7 +115,7 @@ class TodayWidget : GlanceAppWidget() {
                         // 빈 칸: 아직 안 찍은 자리
                         Box(modifier = GlanceModifier.size(48.dp).cornerRadius(12.dp).background(Slot)) {}
                     }
-                    if (i < THUMBS - 1) Spacer(GlanceModifier.width(6.dp))
+                    if (i < slots - 1) Spacer(GlanceModifier.width(6.dp))
                 }
                 Spacer(GlanceModifier.defaultWeight())
                 Column(horizontalAlignment = Alignment.End, modifier = GlanceModifier.padding(end = 10.dp)) {
