@@ -3,6 +3,14 @@ package app.dishlog.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
+import java.time.ZoneOffset
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -251,6 +259,8 @@ internal fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
     val slots = LocalSlots.current
     var tag by remember { mutableStateOf(e.tag) }
     var minute by remember { mutableIntStateOf(minuteOfDay(e.takenAt)) }
+    var date by remember { mutableStateOf(LocalDate.ofEpochDay(e.epochDay)) }
+    var pickingDate by remember { mutableStateOf(false) }
     var fullness by remember { mutableStateOf(e.fullness) }
     var note by remember { mutableStateOf(e.note) }
 
@@ -270,7 +280,17 @@ internal fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionTitle("시간")
+                SectionTitle("날짜 · 시간")
+                Row(
+                    Modifier.height(44.dp).clip(RoundedCornerShape(14.dp)).background(C.Surface)
+                        .border(1.dp, C.Border, RoundedCornerShape(14.dp))
+                        .clickable { pickingDate = true }.padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = C.Body, modifier = Modifier.size(18.dp))
+                    Text(dateFmt.format(date), fontSize = 15.sp, color = C.Ink)
+                }
                 TimeWheel(minute, { minute = it }, label = "먹은 시간")
             }
 
@@ -301,8 +321,8 @@ internal fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
                 ) { Text("취소", color = C.Body) }
                 Button(
                     onClick = {
-                        val zoned = Instant.ofEpochMilli(e.takenAt).atZone(ZoneId.systemDefault())
-                        val takenAt = zoned.withHour(minute / 60).withMinute(minute % 60).toInstant().toEpochMilli()
+                        val takenAt = date.atTime(minute / 60, minute % 60)
+                            .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                         scope.launch {
                             repo.update(e.copy(tag = tag, takenAt = takenAt, fullness = fullness, note = note))
                             sheet.hide()
@@ -316,6 +336,27 @@ internal fun EditSheet(repo: MealRepository, e: MealEntry, onDone: () -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
         }
+    }
+
+    if (pickingDate) {
+        val zone = ZoneOffset.UTC // DatePicker 는 UTC 자정 기준 millis 를 써요
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(zone).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) =
+                    utcTimeMillis <= LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { pickingDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { date = Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
+                    pickingDate = false
+                }) { Text("확인") }
+            },
+            dismissButton = { TextButton(onClick = { pickingDate = false }) { Text("취소") } },
+        ) { DatePicker(state = state, showModeToggle = false) }
     }
 }
 

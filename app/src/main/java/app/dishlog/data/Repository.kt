@@ -136,7 +136,11 @@ class MealRepository(
         }
     }
 
-    suspend fun update(e: MealEntry) = db.meals().update(e)
+    /** 저장할 때 날짜(epochDay)는 항상 찍은 시각에서 다시 계산해요. 날짜를 바꾸면 그 날로 옮겨가요. */
+    suspend fun update(e: MealEntry) {
+        val day = Instant.ofEpochMilli(e.takenAt).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+        db.meals().update(e.copy(epochDay = day))
+    }
 
     suspend fun setTime(e: MealEntry, takenAt: Long) {
         val day = Instant.ofEpochMilli(takenAt).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
