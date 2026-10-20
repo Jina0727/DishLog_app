@@ -33,3 +33,41 @@ fun decodeUpright(path: String, minSide: Int): Bitmap? {
     if (rotated !== raw) raw.recycle()
     return rotated
 }
+
+/**
+ * 사진첩에서 고른 사진을 앱 사진 폴더로 가져와요.
+ * 찍은 사진과 똑같이 바로 선 방향 + 가운데 기준 정사각형으로 맞춰 저장하고,
+ * 사진에 적힌 촬영 시각(EXIF)을 함께 돌려줘요. 없으면 null.
+ */
+fun importSquare(context: android.content.Context, uri: android.net.Uri, dest: java.io.File, maxSide: Int = 2048): Long? {
+    val cr = context.contentResolver
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    var sample = 1
+    while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+    val raw = cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
+        ?: throw java.io.IOException("사진을 열 수 없어요")
+
+    val exif = runCatching { cr.openInputStream(uri)?.use { ExifInterface(it) } }.getOrNull()
+    val degrees = when (exif?.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
+    }
+    val upright = if (degrees == 0f) raw else
+        Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(degrees) }, true)
+
+    val side = minOf(upright.width, upright.height)
+    var square = Bitmap.createBitmap(upright, (upright.width - side) / 2, (upright.height - side) / 2, side, side)
+    if (side > maxSide) square = Bitmap.createScaledBitmap(square, maxSide, maxSide, true)
+    dest.outputStream().use { square.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+
+    return exif?.let { e ->
+        val s = e.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: e.getAttribute(ExifInterface.TAG_DATETIME) ?: return@let null
+        runCatching {
+            java.time.LocalDateTime.parse(s, java.time.format.DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss"))
+                .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }.getOrNull()
+    }
+}

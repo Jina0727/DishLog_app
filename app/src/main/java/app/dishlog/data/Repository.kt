@@ -52,7 +52,7 @@ fun minuteOfDay(epochMillis: Long): Int {
 }
 
 class MealRepository(
-    context: Context,
+    private val appContext: Context,
     private val db: AppDatabase,
     val prefs: Prefs,
     private val makeEstimator: (apiKey: String) -> CalorieEstimator,
@@ -62,10 +62,28 @@ class MealRepository(
     private val estimator: CalorieEstimator?
         get() = prefs.apiKey.takeIf { it.isNotBlank() }?.let(makeEstimator)
 
-    private val photoDir = File(context.filesDir, "photos").apply { mkdirs() }
+    private val photoDir = File(appContext.filesDir, "photos").apply { mkdirs() }
 
     val hasEstimator: Boolean get() = estimator != null
     val slots: Flow<List<TimeSlot>> = db.slots().observeAll()
+
+    /**
+     * 사진첩에서 고른 사진들을 가져와 기록 하나로 만들어요.
+     * 촬영 시각은 사진 정보(EXIF)에서 가장 이른 것을 쓰고, 없으면 지금 시각.
+     * extra: 카메라로 이미 찍어둔 사진이 있으면 함께 묶어요.
+     */
+    suspend fun importEntry(uris: List<android.net.Uri>, extra: List<File> = emptyList()): MealEntry {
+        val (files, times) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            uris.mapNotNull { uri ->
+                val f = newPhotoFile()
+                runCatching { f to importSquare(appContext, uri, f) }.getOrNull()
+            }.unzip()
+        }
+        if (files.isEmpty() && extra.isEmpty()) throw java.io.IOException("사진을 가져오지 못했어요")
+        val takenAt = if (extra.isNotEmpty()) System.currentTimeMillis()
+        else times.filterNotNull().minOrNull()?.coerceAtMost(System.currentTimeMillis()) ?: System.currentTimeMillis()
+        return createEntry(extra + files, takenAt)
+    }
 
     fun newPhotoFile(): File = File(photoDir, "${System.currentTimeMillis()}_${UUID.randomUUID()}.jpg")
 

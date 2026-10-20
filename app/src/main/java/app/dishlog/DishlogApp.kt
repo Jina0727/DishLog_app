@@ -19,7 +19,7 @@ class DishlogApp : Application() {
     override fun onCreate() {
         super.onCreate()
         repo = MealRepository(
-            context = this,
+            appContext = this,
             db = AppDatabase.build(this),
             prefs = Prefs(this),
             makeEstimator = { key -> ClaudeCalorieEstimator(key, ClaudeCalorieEstimator.MODEL) },

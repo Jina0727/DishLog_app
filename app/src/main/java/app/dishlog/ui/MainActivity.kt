@@ -74,6 +74,18 @@ class MainActivity : ComponentActivity() {
                                                 nav.navigate("entry/${e.id}")
                                             }
                                         },
+                                        onImport = { uris, shots ->
+                                            scope.launch {
+                                                runCatching { repo.importEntry(uris, shots) }
+                                                    .onSuccess { e ->
+                                                        nav.popBackStack("capture", inclusive = true)
+                                                        nav.navigate("entry/${e.id}")
+                                                    }
+                                                    .onFailure {
+                                                        android.widget.Toast.makeText(this@MainActivity, "사진을 가져오지 못했어요", android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                            }
+                                        },
                                     )
                                 }
                             }

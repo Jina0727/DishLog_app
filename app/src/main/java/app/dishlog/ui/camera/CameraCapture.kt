@@ -2,9 +2,11 @@ package app.dishlog.ui.camera
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.util.Rational
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -34,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -77,6 +80,8 @@ fun CameraCapture(
     tagLabel: String,
     onClose: () -> Unit,
     onDone: (List<File>) -> Unit,
+    /** 사진첩에서 고른 사진들 (+ 이미 찍어둔 사진). null 이면 앨범 버튼을 숨겨요. */
+    onImport: ((uris: List<Uri>, shots: List<File>) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -91,6 +96,17 @@ fun CameraCapture(
         ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
     }
     val shots = remember { mutableStateListOf<File>() }
+    // 시스템 사진 선택기: 권한 없이 사진첩을 열어요. 한 끼 최대 10장.
+    val pickMany = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) { uris ->
+        if (uris.isNotEmpty()) onImport?.invoke(uris, shots.toList())
+    }
+    val pickOne = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onImport?.invoke(listOf(uri), emptyList())
+    }
+    fun openAlbum() {
+        val req = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        if (singleShot) pickOne.launch(req) else pickMany.launch(req)
+    }
     var busy by remember { mutableStateOf(false) }
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     DisposableEffect(Unit) { onDispose { provider?.unbindAll() } }
@@ -216,6 +232,20 @@ fun CameraCapture(
         }
 
         Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
+            if (onImport != null) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 44.dp)
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White.copy(alpha = 0.14f))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        .semantics { contentDescription = "사진첩에서 고르기" }
+                        .clickable(role = Role.Button, onClick = ::openAlbum),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = Color.White) }
+            }
             Box(
                 Modifier
                     .size(80.dp)

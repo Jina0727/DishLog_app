@@ -98,6 +98,9 @@ class QuickCaptureActivity : ComponentActivity() {
                                     tagLabel = currentTagLabel(slots, repo.prefs.outsideNearest),
                                     onClose = { finish() },
                                     onDone = { files -> scope.launch { savedId = repo.createEntry(files).id } },
+                                    onImport = { uris, _ ->
+                                        scope.launch { runCatching { repo.importEntry(uris) }.onSuccess { savedId = it.id } }
+                                    },
                                 )
                             } else {
                                 SavedPanel(repo, id, onClose = { finish() })
